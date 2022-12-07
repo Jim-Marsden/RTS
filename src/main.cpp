@@ -1,66 +1,79 @@
-#include "test_runner.h"
+//
+// Created by Jim on 11/20/22.
+//
 
+#include <SFML/Graphics.hpp>
 #include <iostream>
-#include "smk/Shape.hpp"
-#include "smk/Color.hpp"
-#include <smk/Window.hpp>
-#include <smk/Input.hpp>
-#include <smk/Sprite.hpp>
-#include <smk/RenderTarget.hpp>
-smk::Sprite make_sprite(smk::Texture const & texture){
+#include <random>
+#include <memory>
+#include "window_manager.h"
+#include "imgui.h" // necessary for ImGui::*, imgui-SFML.h doesn't include imgui.h
 
-    smk::Sprite result(texture);
-    result.SetCenter(16,16);
-    result.SetPosition(128, 128);
+#include "imgui-SFML.h" // for ImGui::SFML::* functions and SFML-specific overloads
 
-    return result;
+auto generate_random_number(float range){
+    static std::random_device rd;
+    sf::RenderTexture rt;
+    std::uniform_int_distribution<float> dist({}, range);
+    return dist(rd);
 }
 
-auto make_shape(){
-    auto result = smk::Shape::RoundedRectangle(32, 32, 1);
+int main() try {
+    auto up = std::make_unique<int>();
+    std::random_device rd;
+    sf::RenderTexture rt;
 
-//    result.SetScale(32, 32);
-    result.SetCenter(16,16);
-    result.SetPosition(128, 128);
+    sf::Vector3 target_color{1.0f,0.0f,1.0f};
+    window_manager window(120, 120, "text");
 
 
-    return result;
+    sf::Texture texture;
+    sf::Shader test;
+    if(not test.loadFromFile("data/shaders/outline_test.frag", sf::Shader::Type::Fragment))
+        std::cerr << "inavlid shader :c\n";
+
+
+    if(not rt.create(window.get_size()))
+        throw std::runtime_error("rt.create failed to create");
+    if(not texture.loadFromFile("data/test1.png"))
+        throw std::runtime_error("texture.loadFromFile failed to load from file"); // lol
+    sf::Sprite sprite(texture);
+
+    sf::Sprite sprite2(texture);
+    sprite.setOrigin({sprite.getScale().x / 2, sprite.getScale().y / 2});
+    sprite2.move({64, 64});
+    sprite2.setOrigin({sprite2.getScale().x / 2, sprite2.getScale().y / 2});
+    test.setUniform("selected_color", target_color);
+    test.setUniform("outline_scale", 0.01f);
+
+    sf::Clock deltaClock{};
+
+    bool bool_thing{};
+
+
+    while(window.do_events()){
+
+
+
+        window.clear();
+        ImGui::SFML::Update(static_cast<sf::RenderWindow&>(window), deltaClock.restart());
+
+
+        ImGui::Begin("Hello, world!");
+        ImGui::Button("Look at this pretty button");
+        ImGui::End();
+        rt.clear(sf::Color::Yellow);
+        window.draw(sprite, sf::RenderStates(&test));
+
+        sprite2.setPosition({generate_random_number(window.get_size().x),
+                             generate_random_number(window.get_size().y)});
+        sprite2.getGlobalBounds();
+        ImGui::Render();
+        window.draw(sprite2, sf::RenderStates(&test));
+        window.display();
+    }
+    return 0;
 }
-
-int main(int argc, char** argv) {
-    auto window = smk::Window(640, 640, "smk/example/text");
-
-
-    std::vector<smk::Transformable> recs;
-    recs.resize(10000);
-
-    smk::Texture const texture("./data/test1.png");
-
-
-    for(auto & e : recs){ e = make_shape();}
-
-    window.ExecuteMainLoop([&] {
-        window.PoolEvents();
-        window.Clear(smk::Color::Black);
-
-
-
-        for(auto const & e : recs) window.Draw(e);
-        if(window.input().IsKeyPressed(GLFW_KEY_F1)) {
-            recs.emplace_back(make_sprite(texture));
-            recs.back().SetPosition(window.input().mouse());
-            std::cout << recs.size() << '\n';
-        }
-
-        if(window.input().IsKeyPressed(GLFW_KEY_F2)){
-
-            if(!recs.empty()) recs.pop_back();
-            std::cout << recs.size() << '\n';
-        }
-        window.Display();
-
-        smk::View v;
-        window.SetView(window.view());
-    });
-    // return result;
+catch (std::exception &e) {
+    std::cout << "an exception\n";
 }
